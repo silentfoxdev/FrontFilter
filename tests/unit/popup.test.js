@@ -115,6 +115,7 @@ async function loadPopup({
   storedSettings = {},
   autoResolveWrites = false,
   getSettings,
+  locationSearch = "",
   tabs = [],
 } = {}) {
   const ids = [
@@ -185,6 +186,7 @@ async function loadPopup({
       return element;
     },
     createTextNode: () => ({}),
+    body: new FakeElement("body"),
     documentElement,
     getElementById: (id) => elements[id],
     querySelectorAll: (selector) => selector === '[role="tab"]' ? tabsElements : [],
@@ -200,7 +202,7 @@ async function loadPopup({
           const completion = deferred();
           writes.push({ settings, completion });
           if (autoResolveWrites) {
-            currentSettings = settings;
+            currentSettings = { ...currentSettings, ...settings };
             completion.resolve();
           }
           return completion.promise;
@@ -220,6 +222,7 @@ async function loadPopup({
       getItem: (key) => themeCache.get(key) ?? null,
       setItem: (key, value) => themeCache.set(key, String(value)),
     },
+    location: { search: locationSearch },
     setTimeout,
     clearTimeout,
   });
@@ -306,14 +309,16 @@ test("serializes popup saves so an older write cannot finish last", async () => 
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(writes.length, 1);
-  assert.equal(writes[0].settings.blockHomepage, true);
-  assert.equal(writes[0].settings.blockPopular, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(writes[0].settings)), {
+    blockHomepage: true,
+  });
 
   writes[0].completion.resolve();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(writes.length, 2);
-  assert.equal(writes[1].settings.blockHomepage, true);
-  assert.equal(writes[1].settings.blockPopular, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(writes[1].settings)), {
+    blockPopular: true,
+  });
 
   writes[1].completion.resolve();
   await new Promise((resolve) => setImmediate(resolve));
@@ -540,6 +545,26 @@ test("adds the current tab's subreddit and reports non-subreddit tabs", async ()
   );
 });
 
+test("adds the originating subreddit from standalone blocked-page settings", async () => {
+  const popup = await loadPopup({
+    autoResolveWrites: true,
+    locationSearch: "?standalone=true&currentSubreddit=Firefox",
+    tabs: [{ url: "chrome-extension://frontfilter/popup/index.html?standalone=true" }],
+  });
+
+  await popup.elements["add-current-subreddit"].click();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(
+    getRenderedItems(popup.elements)[0].querySelector("input").value,
+    "firefox",
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(popup.writes.at(-1).settings.blockedSubreddits)),
+    [{ name: "firefox", mode: "all" }],
+  );
+});
+
 test("exports the normalized stored configuration as a JSON download", async () => {
   const { createdElements, elements } = await loadPopup({
     storedSettings: {
@@ -576,7 +601,7 @@ test("exports the normalized stored configuration as a JSON download", async () 
   assert.equal(elements["toast"].textContent, "Configuration exported!");
 });
 
-test("reenables controls and reports an initial storage read failure", async () => {
+test("keeps controls disabled after an initial storage read failure", async () => {
   const { elements } = await loadPopup({
     getSettings: async () => {
       throw new Error("storage unavailable");
@@ -584,8 +609,9 @@ test("reenables controls and reports an initial storage read failure", async () 
   });
 
   assert.equal(elements["toast"].textContent, "Could not load settings: storage unavailable");
-  assert.equal(elements["block-homepage"].disabled, false);
-  assert.equal(elements["import-config"].disabled, false);
+  assert.equal(elements["block-homepage"].disabled, true);
+  assert.equal(elements["import-config"].disabled, true);
+  assert.equal(elements["add-subreddit"].disabled, true);
 });
 
 test("makes hiding all comments imply the nested reply toggle", async () => {
@@ -655,9 +681,9 @@ test("makes hiding the navbar imply its indented section toggles", async () => {
   elements[sectionIds[1]].checked = true;
   elements[sectionIds[1]].dispatch("change");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(writes.at(-1).settings.hideNavbar, false);
-  assert.equal(writes.at(-1).settings.hideNavbarSearch, true);
-  assert.equal(writes.at(-1).settings.hideNavbarOthers, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(writes.at(-1).settings)), {
+    hideNavbarSearch: true,
+  });
 });
 
 test("makes hiding the left sidebar imply its indented section toggles", async () => {
@@ -697,9 +723,9 @@ test("makes hiding the left sidebar imply its indented section toggles", async (
   elements[sectionIds[0]].checked = true;
   elements[sectionIds[0]].dispatch("change");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(writes.at(-1).settings.hideLeftSidebar, false);
-  assert.equal(writes.at(-1).settings.hideLeftSidebarGames, true);
-  assert.equal(writes.at(-1).settings.hideLeftSidebarResources, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(writes.at(-1).settings)), {
+    hideLeftSidebarGames: true,
+  });
 });
 
 test("maps every checkbox to the matching storage setting", async () => {
@@ -745,9 +771,29 @@ test("maps every checkbox to the matching storage setting", async () => {
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(writes.length, 1);
-  for (const [elementId, settingKey] of Object.entries(settingByElementId)) {
-    assert.equal(writes[0].settings[settingKey], elements[elementId].checked);
-  }
+  assert.deepEqual(JSON.parse(JSON.stringify(writes[0].settings)), {
+    blockHomepage: false,
+  });
+});
+
+test("saves only changed settings so another open settings page cannot be clobbered", async () => {
+  const { elements, writes } = await loadPopup({
+    storedSettings: {
+      blockPopular: false,
+      blockedSubreddits: [{ name: "firefox", mode: "all" }],
+    },
+    autoResolveWrites: true,
+  });
+
+  // Another settings page may have changed these values after this page loaded.
+  // A local theme edit must not write this page's stale copies back to storage.
+  elements["color-theme"].value = "light";
+  elements["color-theme"].dispatch("change");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(JSON.parse(JSON.stringify(writes[0].settings)), {
+    theme: "light",
+  });
 });
 
 test("follows the system theme by default and persists explicit color modes", async () => {
@@ -907,8 +953,9 @@ test("loads and saves typed scroll settings and disables dependent controls", as
   elements["scroll-limit"].value = "12";
   elements["scroll-limit"].dispatch("change");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(writes.at(-1).settings.scrollLimit, 12);
-  assert.equal(writes.at(-1).settings.scrollMode, "button");
+  assert.deepEqual(JSON.parse(JSON.stringify(writes.at(-1).settings)), {
+    scrollLimit: 12,
+  });
   elements["scroll-limit"].value = "0";
   elements["scroll-limit"].dispatch("change");
   assert.equal(elements["scroll-limit"].value, "12");
@@ -917,7 +964,9 @@ test("loads and saves typed scroll settings and disables dependent controls", as
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(elements["scroll-limit"].disabled, true);
   assert.equal(elements["scroll-mode"].disabled, true);
-  assert.equal(writes.at(-1).settings.scrollLimit, 12);
+  assert.deepEqual(JSON.parse(JSON.stringify(writes.at(-1).settings)), {
+    limitInfiniteScroll: false,
+  });
 });
 
 test("imports typed scroll preferences without dropping unrelated settings", async () => {

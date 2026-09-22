@@ -288,9 +288,7 @@ test("hides each navbar section without hiding the Reddit logo", async () => {
     });
     const styleText = content.injectedStyles[0].textContent;
     assert.ok(styleText.includes(selector), setting);
-    if (setting === "hideNavbarMenu") {
-      assert.match(styleText, /expand-user-drawer-button\[class\*="min-w-"\]/);
-    }
+    if (setting === "hideNavbarMenu") assert.doesNotMatch(styleText, /expand-user-drawer-button/);
     assert.doesNotMatch(styleText, /#reddit-logo/);
     assert.doesNotMatch(styleText, /#shreddit-header, reddit-header-large/);
     assert.deepEqual(content.queriedSelectors, []);
@@ -414,6 +412,19 @@ test("hides links to blocked main pages from the top left-navigation section", a
   await new Promise((resolve) => setImmediate(resolve));
   assert.doesNotMatch(style.textContent, /a\[href="\/news" i\]/);
   assert.match(style.textContent, /a\[href="\/explore" i\]/);
+});
+
+test("hides every global feed-sort link when the homepage is blocked", async () => {
+  const content = await loadContent({
+    settings: { blockHomepage: true },
+    startUrl: "https://www.reddit.com/r/firefox/",
+  });
+  const styleText = content.injectedStyles[0].textContent;
+
+  for (const sort of ["best", "hot", "new", "top", "rising", "controversial"]) {
+    assert.ok(styleText.includes(`a[href="/${sort}" i]`), sort);
+    assert.ok(styleText.includes(`a[href^="/${sort}?" i]`), sort);
+  }
 });
 
 test("updates blocked main-page links inside the top navigation shadow root", async () => {

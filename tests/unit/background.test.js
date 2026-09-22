@@ -15,6 +15,7 @@ async function loadBackground({
   const listeners = {};
   const updates = [];
   const removedKeys = [];
+  const createdTabs = [];
   let storedSettings = { ...settings };
   let rules = dynamicRules.map((rule) => ({ ...rule }));
 
@@ -46,13 +47,17 @@ async function loadBackground({
       onChanged: { addListener(listener) { listeners.storageChanged = listener; } },
     },
     tabs: {
-      async create(options) { return options; },
+      async create(options) {
+        createdTabs.push(options);
+        return options;
+      },
     },
   };
   const context = vm.createContext({
     URL,
     URLSearchParams,
     chrome,
+    createdTabs,
     console,
   });
 
@@ -69,6 +74,7 @@ async function loadBackground({
 
   return {
     chrome,
+    createdTabs,
     listeners,
     removedKeys,
     rules: () => rules,
@@ -144,9 +150,14 @@ test("opens standalone settings and reports failures through message responses",
   assert.deepEqual(
     JSON.parse(JSON.stringify(await sendMessage(
       background.listeners.message,
-      { action: "openSettings" },
+      { action: "openSettings", currentSubreddit: "Firefox" },
     ))),
     { success: true },
+  );
+  assert.equal(background.createdTabs.length, 1);
+  assert.equal(
+    background.createdTabs[0].url,
+    "chrome-extension://frontfilter/popup/index.html?standalone=true&currentSubreddit=firefox",
   );
 
   background.chrome.tabs.create = async () => {

@@ -161,7 +161,7 @@ def main():
                 configure({"hideNavbarMenu": True})
                 wait.until(lambda _: driver.execute_script("return navbarVisibility()") == {
                     **visible_navbar,
-                    "menu": False, "profile": False,
+                    "menu": False,
                 })
                 configure({"hideNavbarMenu": False})
                 wait.until(lambda _: driver.execute_script("return navbarVisibility()") == visible_navbar)

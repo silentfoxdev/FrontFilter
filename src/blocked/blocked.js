@@ -40,21 +40,39 @@ document.addEventListener("DOMContentLoaded", () => {
     reason.hidden = false;
   }
 
-  document.getElementById("go-back").addEventListener("click", () => {
-    window.history.length > 1
-      ? window.history.back()
-      : (window.location.href = "https://www.reddit.com");
+  document.getElementById("go-back").addEventListener("click", async () => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    try {
+      const settings = FrontFilter.coerceSettings(
+        await chrome.storage.local.get(FrontFilter.NAVIGATION_STORAGE_KEYS),
+      );
+      if (!FrontFilter.getBlockedRoute("/", settings)) {
+        window.location.href = "https://www.reddit.com";
+        return;
+      }
+    } catch (error) {
+      console.error("Could not determine a safe fallback page:", error);
+    }
+
+    window.location.href = getStandaloneSettingsUrl(returnSubreddit);
   });
 
   document.getElementById("go-to-settings").addEventListener("click", async () => {
     try {
-      const response = await chrome.runtime.sendMessage({ action: "openSettings" });
+      const response = await chrome.runtime.sendMessage({
+        action: "openSettings",
+        currentSubreddit: returnSubreddit,
+      });
       if (response?.success) return;
     } catch {
       // Fall through to opening the standalone settings page in this tab.
     }
 
-    window.location.href = chrome.runtime.getURL("popup/index.html?standalone=true");
+    window.location.href = getStandaloneSettingsUrl(returnSubreddit);
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -65,6 +83,15 @@ document.addEventListener("DOMContentLoaded", () => {
     void restoreIfUnblocked(returnUrl);
   });
 });
+
+function getStandaloneSettingsUrl(currentSubreddit = "") {
+  const settingsUrl = new URL(chrome.runtime.getURL("popup/index.html"));
+  settingsUrl.searchParams.set("standalone", "true");
+  if (currentSubreddit) {
+    settingsUrl.searchParams.set("currentSubreddit", currentSubreddit);
+  }
+  return settingsUrl.href;
+}
 
 function applyTheme(theme) {
   const normalizedTheme = FrontFilter.normalizeTheme(theme);

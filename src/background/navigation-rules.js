@@ -59,8 +59,9 @@ FrontFilter.createNavigationRules = function (settings, blockPageUrl) {
     }, priority);
   }
 
+  const frontSorts = "(best|hot|new|top|rising|controversial)";
   const pageRules = [
-    ["blockHomepage", "homepage", "Homepage", `${reddit}/?${query}`],
+    ["blockHomepage", "homepage", "Homepage", `${reddit}(/${frontSorts})?/?${query}`],
     ["blockPopular", "popular", "r/popular", `${reddit}/r/popular(/.*)?${query}`],
     ["blockExplore", "explore", "Explore", `${reddit}/explore(/.*)?${query}`],
     ["blockNews", "news", "News", `${reddit}/news(/.*)?${query}`],

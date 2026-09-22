@@ -357,7 +357,7 @@ window.addEventListener("frontfilter-test-sync-rules", async () => {
             configure(hideNavbarMenu=True)
             wait.until(lambda _: js("return navbarVisibility()") == {
                 **visible_navbar,
-                "menu": False, "profile": False,
+                "menu": False,
             })
             configure(hideNavbarMenu=False)
             wait.until(lambda _: js("return navbarVisibility()") == visible_navbar)

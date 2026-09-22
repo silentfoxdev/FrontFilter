@@ -176,32 +176,60 @@ test("rejects non-web return URLs even when the hostname is Reddit", async () =>
 
 test("falls back to standalone settings when the background reports failure", async () => {
   const { elements, location } = await loadBlockPage({
+    hash: "#https://www.reddit.com/r/firefox/comments/abc/title",
+    search: "?target=subreddit",
     sendMessage: async () => ({ success: false, error: "tabs unavailable" }),
   });
 
   await elements["go-to-settings"].click();
   assert.equal(
     location.href,
-    "moz-extension://frontfilter/popup/index.html?standalone=true",
+    "moz-extension://frontfilter/popup/index.html?standalone=true&currentSubreddit=firefox",
   );
 });
 
 test("keeps the block page open when settings open successfully", async () => {
-  const { elements, location } = await loadBlockPage();
+  const messages = [];
+  const { elements, location } = await loadBlockPage({
+    hash: "#https://www.reddit.com/r/firefox/comments/abc/title",
+    search: "?target=subreddit",
+    sendMessage: async (message) => {
+      messages.push(message);
+      return { success: true };
+    },
+  });
 
   await elements["go-to-settings"].click();
 
   assert.equal(location.href, "moz-extension://frontfilter/blocked/index.html");
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [{
+    action: "openSettings",
+    currentSubreddit: "firefox",
+  }]);
 });
 
 test("goes back when history exists and otherwise returns to Reddit", async () => {
   const withHistory = await loadBlockPage({ historyLength: 2 });
-  withHistory.elements["go-back"].click();
+  await withHistory.elements["go-back"].click();
   assert.equal(withHistory.historyBackCount, 1);
 
   const withoutHistory = await loadBlockPage({ historyLength: 1 });
-  withoutHistory.elements["go-back"].click();
+  await withoutHistory.elements["go-back"].click();
   assert.equal(withoutHistory.location.href, "https://www.reddit.com");
+});
+
+test("uses standalone settings when the no-history fallback homepage is blocked", async () => {
+  const page = await loadBlockPage({
+    historyLength: 1,
+    storedSettings: { blockHomepage: true },
+  });
+
+  await page.elements["go-back"].click();
+
+  assert.equal(
+    page.location.href,
+    "moz-extension://frontfilter/popup/index.html?standalone=true",
+  );
 });
 
 test("restores the original Reddit URL after a local setting unblocks it", async () => {

@@ -4,10 +4,11 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-  if (
-    new URLSearchParams(globalThis.location?.search).get("standalone") ===
-    "true"
-  ) {
+  const pageParams = new URLSearchParams(globalThis.location?.search);
+  const standaloneCurrentSubreddit = FrontFilter.normalizeAllowedSubreddits([
+    pageParams.get("currentSubreddit"),
+  ])[0] || "";
+  if (pageParams.get("standalone") === "true") {
     document.body.classList.add("standalone");
   }
 
@@ -98,6 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let toastTimer = null;
   let indicatorTimer = null;
   let debounceTimer = null;
+  const pendingSaveKeys = new Set();
   let saveQueue = Promise.resolve();
   let latestSaveId = 0;
   let controlsDisabled = false;
@@ -258,15 +260,18 @@ document.addEventListener("DOMContentLoaded", () => {
     return normalizedTheme;
   }
 
-  function queueSave() {
+  function queueSave(keys) {
     const saveId = ++latestSaveId;
     const snapshot = getSettingsSnapshot();
+    const settings = Object.fromEntries(
+      Array.from(keys, (key) => [key, snapshot[key]]),
+    );
     updateBlockedCount();
     updateAllowedCount();
     updateTitleKeywordCount();
     showSaving();
 
-    enqueueStorageWrite(snapshot);
+    enqueueStorageWrite(settings);
     saveQueue.then(
       () => showSaved(saveId),
       (error) => {
@@ -286,18 +291,27 @@ document.addEventListener("DOMContentLoaded", () => {
     return saveQueue;
   }
 
-  function scheduleAutoSave(immediate = false) {
+  function queuePendingSave() {
+    if (pendingSaveKeys.size === 0) return saveQueue;
+
+    const keys = new Set(pendingSaveKeys);
+    pendingSaveKeys.clear();
+    return queueSave(keys);
+  }
+
+  function scheduleAutoSave(keys, immediate = false) {
+    for (const key of keys) pendingSaveKeys.add(key);
     clearTimeout(debounceTimer);
     debounceTimer = null;
 
     if (immediate) {
-      queueSave();
+      queuePendingSave();
       return;
     }
 
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
-      queueSave();
+      queuePendingSave();
     }, 700);
   }
 
@@ -305,8 +319,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
       debounceTimer = null;
-      queueSave();
     }
+    queuePendingSave();
 
     await saveQueue;
   }
@@ -394,7 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       input.addEventListener("input", (event) => {
         entry.name = event.target.value;
-        scheduleAutoSave();
+        scheduleAutoSave(["blockedSubreddits"]);
       });
       input.addEventListener("blur", (event) => {
         const normalizedName = FrontFilter.normalizeSubredditName(
@@ -402,18 +416,18 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         entry.name = normalizedName;
         event.target.value = normalizedName;
-        scheduleAutoSave(true);
+        scheduleAutoSave(["blockedSubreddits"], true);
       });
       select.addEventListener("change", (event) => {
         entry.mode = event.target.value === "all" ? "all" : "home";
-        scheduleAutoSave(true);
+        scheduleAutoSave(["blockedSubreddits"], true);
       });
       removeBtn.addEventListener("click", () => {
         const entryIndex = entries.indexOf(entry);
         if (entryIndex < 0) return;
         entries.splice(entryIndex, 1);
         renderList();
-        scheduleAutoSave(true);
+        scheduleAutoSave(["blockedSubreddits"], true);
       });
 
       item.appendChild(input);
@@ -446,7 +460,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderList();
     focusEntry(normalizedName, animate);
 
-    if (normalizedName) scheduleAutoSave(true);
+    if (normalizedName) scheduleAutoSave(["blockedSubreddits"], true);
   }
 
   function normalizeAllowedName(value) {
@@ -503,7 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       input.addEventListener("input", (event) => {
         entry.name = event.target.value;
-        scheduleAutoSave();
+        scheduleAutoSave(["allowedSubreddits"]);
       });
       input.addEventListener("blur", (event) => {
         const normalizedName = normalizeAllowedName(event.target.value);
@@ -512,14 +526,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         entry.name = normalizedName;
         event.target.value = normalizedName;
-        scheduleAutoSave(true);
+        scheduleAutoSave(["allowedSubreddits"], true);
       });
       removeBtn.addEventListener("click", () => {
         const entryIndex = allowedEntries.indexOf(entry);
         if (entryIndex < 0) return;
         allowedEntries.splice(entryIndex, 1);
         renderAllowedList();
-        scheduleAutoSave(true);
+        scheduleAutoSave(["allowedSubreddits"], true);
       });
 
       item.appendChild(input);
@@ -548,7 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderAllowedList();
     focusAllowedEntry(normalizedName, animate);
 
-    if (normalizedName) scheduleAutoSave(true);
+    if (normalizedName) scheduleAutoSave(["allowedSubreddits"], true);
   }
 
   function sortKeywordEntries() {
@@ -603,7 +617,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       input.addEventListener("input", (event) => {
         entry.value = event.target.value;
-        scheduleAutoSave();
+        scheduleAutoSave(["blockedTitleKeywords"]);
       });
       input.addEventListener("blur", (event) => {
         const [normalizedKeyword = ""] = FrontFilter.normalizeTitleKeywords([
@@ -611,14 +625,14 @@ document.addEventListener("DOMContentLoaded", () => {
         ]);
         entry.value = normalizedKeyword;
         event.target.value = normalizedKeyword;
-        scheduleAutoSave(true);
+        scheduleAutoSave(["blockedTitleKeywords"], true);
       });
       removeBtn.addEventListener("click", () => {
         const entryIndex = keywordEntries.indexOf(entry);
         if (entryIndex < 0) return;
         keywordEntries.splice(entryIndex, 1);
         renderKeywordList();
-        scheduleAutoSave(true);
+        scheduleAutoSave(["blockedTitleKeywords"], true);
       });
 
       item.appendChild(input);
@@ -647,7 +661,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderKeywordList();
     focusKeyword(normalizedKeyword, animate);
 
-    if (normalizedKeyword) scheduleAutoSave(true);
+    if (normalizedKeyword) scheduleAutoSave(["blockedTitleKeywords"], true);
   }
 
   async function loadSettings() {
@@ -735,21 +749,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   Object.entries(checkboxes).forEach(([key, checkbox]) => {
     checkbox.addEventListener("change", () => {
+      const changedKeys = [key];
       if (key === "hideNavbar") {
         for (const sectionKey of navbarSectionKeys) {
           checkboxes[sectionKey].checked = checkbox.checked;
         }
+        changedKeys.push(...navbarSectionKeys);
       }
       if (key === "hideLeftSidebar") {
         for (const sectionKey of leftSidebarSectionKeys) {
           checkboxes[sectionKey].checked = checkbox.checked;
         }
+        changedKeys.push(...leftSidebarSectionKeys);
+      }
+      if (key === "hideComments") {
+        changedKeys.push("hideCommentReplies");
       }
       updateScrollControls();
       updateCommentControls();
       updateNavbarControls();
       updateLeftSidebarControls();
-      scheduleAutoSave(true);
+      scheduleAutoSave(changedKeys, true);
     });
   });
 
@@ -761,12 +781,12 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     lastScrollLimit = value;
-    scheduleAutoSave(true);
+    scheduleAutoSave(["scrollLimit"], true);
   });
-  scrollMode.addEventListener("change", () => scheduleAutoSave(true));
+  scrollMode.addEventListener("change", () => scheduleAutoSave(["scrollMode"], true));
   colorTheme.addEventListener("change", () => {
     colorTheme.value = applyTheme(colorTheme.value);
-    scheduleAutoSave(true);
+    scheduleAutoSave(["theme"], true);
   });
 
   addBtn.addEventListener("click", () => addEntry());
@@ -775,6 +795,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function addCurrentSubreddit(addEntryCallback) {
     try {
+      if (standaloneCurrentSubreddit) {
+        addEntryCallback(standaloneCurrentSubreddit);
+        return;
+      }
+
       const [tab] = await chrome.tabs.query({
         active: true,
         currentWindow: true,
@@ -806,8 +831,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setControlsDisabled(true);
   loadSettings()
+    .then(() => setControlsDisabled(false))
     .catch((error) => {
       showToast(`Could not load settings: ${error.message}`, "error");
-    })
-    .finally(() => setControlsDisabled(false));
+    });
 });

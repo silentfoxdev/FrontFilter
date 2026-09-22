@@ -61,6 +61,8 @@ test("compiles page settings into prioritized main-frame redirects", () => {
 
   for (const [url, page] of [
     ["https://www.reddit.com/", "homepage"],
+    ["https://www.reddit.com/new/", "homepage"],
+    ["https://www.reddit.com/top/?t=week", "homepage"],
     ["http://reddit.com/r/popular/", "popular"],
     ["https://www.reddit.com/explore/", "explore"],
     ["https://www.reddit.com/news/world?feed=home", "news"],
@@ -191,6 +193,9 @@ test("matches the shared route model across network-navigation cases", () => {
   ];
   const urls = [
     "https://www.reddit.com/",
+    "https://www.reddit.com/best/",
+    "https://www.reddit.com/new/",
+    "https://www.reddit.com/top/?t=week",
     "https://old.reddit.com/r/popular/",
     "https://www.reddit.com/explore/topics?show=all",
     "https://www.reddit.com/news/",

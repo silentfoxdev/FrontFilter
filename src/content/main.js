@@ -154,7 +154,6 @@ const NAVBAR_SECTION_SELECTORS = Object.freeze({
     "#hamburger-button-tooltip",
     "#navbar-menu-button",
     "rpl-tooltip:has(#navbar-menu-button)",
-    '#expand-user-drawer-button[class*="min-w-"]',
   ]),
   hideNavbarSearch: scopeNavbarSelectors([
     'faceplate-loader[name^="SearchInputDesktop_"]',
@@ -190,6 +189,14 @@ const MAIN_PAGE_LINK_SELECTORS = Object.freeze({
     'a[href^="/?" i]',
     'a[href="https://www.reddit.com/" i]',
     'a[href^="https://www.reddit.com/?" i]',
+    ...["best", "hot", "new", "top", "rising", "controversial"].flatMap((sort) => [
+      `a[href="/${sort}" i]`,
+      `a[href^="/${sort}/" i]`,
+      `a[href^="/${sort}?" i]`,
+      `a[href="https://www.reddit.com/${sort}" i]`,
+      `a[href^="https://www.reddit.com/${sort}/" i]`,
+      `a[href^="https://www.reddit.com/${sort}?" i]`,
+    ]),
   ],
   blockPopular: [
     'a[href="/r/popular" i]',

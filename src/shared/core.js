@@ -48,8 +48,14 @@ var FrontFilter = (() => {
     "blockSubHome",
   ]);
 
+  const FRONT_PAGE_SORT_PATTERN = "best|hot|new|top|rising|controversial";
   const PAGE_RULES = [
-    { key: "blockHomepage", page: "homepage", filter: "Homepage", pattern: /^\/?$/ },
+    {
+      key: "blockHomepage",
+      page: "homepage",
+      filter: "Homepage",
+      pattern: new RegExp(`^/(?:${FRONT_PAGE_SORT_PATTERN})?/?$`, "i"),
+    },
     { key: "blockPopular", page: "popular", filter: "r/popular", pattern: /^\/r\/popular(?:\/.*)?$/i },
     { key: "blockExplore", page: "explore", filter: "Explore", pattern: /^\/explore(?:\/.*)?$/i },
     { key: "blockNews", page: "news", filter: "News", pattern: /^\/news(?:\/.*)?$/i },
@@ -384,7 +390,7 @@ var FrontFilter = (() => {
   }
 
   function isFeedPath(pathname) {
-    return /^\/(?:best|hot|rising|controversial)?\/?$/i.test(pathname)
+    return new RegExp(`^/(?:${FRONT_PAGE_SORT_PATTERN})?/?$`, "i").test(pathname)
       || /^\/r\/[^/]+(?:\/(?:best|hot|new|top|rising|controversial))?\/?$/i.test(pathname);
   }
 

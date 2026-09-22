@@ -467,6 +467,8 @@ test("global page blocks take precedence over subreddit exceptions", () => {
 test("covers every main-page route without matching similar paths", () => {
   const cases = [
     ["/", { blockHomepage: true }, "homepage"],
+    ["/new", { blockHomepage: true }, "homepage"],
+    ["/top/", { blockHomepage: true }, "homepage"],
     ["/r/popular/new", { blockPopular: true }, "popular"],
     ["/explore/topics", { blockExplore: true }, "explore"],
     ["/news/world", { blockNews: true }, "news"],
@@ -478,6 +480,7 @@ test("covers every main-page route without matching similar paths", () => {
 
   assert.equal(FrontFilter.getBlockedRoute("/explorer", { blockExplore: true }), null);
   assert.equal(FrontFilter.getBlockedRoute("/newsletter", { blockNews: true }), null);
+  assert.equal(FrontFilter.getBlockedRoute("/newest", { blockHomepage: true }), null);
 });
 
 test("distinguishes subreddit fronts from posts for HOME and ALL modes", () => {
@@ -556,10 +559,16 @@ test("normalizes color themes and resets removed themes to system", () => {
 });
 
 test("limits listing routes without treating comments, wiki or settings as feeds", () => {
-  for (const path of ["/", "/best", "/r/popular/", "/r/firefox", "/r/firefox/new/"]) {
+  for (const path of [
+    "/", "/best", "/hot", "/new", "/top", "/rising", "/controversial",
+    "/r/popular/", "/r/firefox", "/r/firefox/new/",
+  ]) {
     assert.equal(FrontFilter.isFeedPath(path), true, path);
   }
-  for (const path of ["/new", "/top", "/r/firefox/comments/abc/post", "/r/firefox/wiki", "/settings", "/message/inbox", "/r/firefox/top/extra"]) {
+  for (const path of [
+    "/r/firefox/comments/abc/post", "/r/firefox/wiki", "/settings",
+    "/message/inbox", "/r/firefox/top/extra",
+  ]) {
     assert.equal(FrontFilter.isFeedPath(path), false, path);
   }
 });

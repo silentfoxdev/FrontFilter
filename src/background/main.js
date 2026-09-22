@@ -61,8 +61,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.action === "openSettings") {
+    const params = new URLSearchParams({ standalone: "true" });
+    const [currentSubreddit] = FrontFilter.normalizeAllowedSubreddits([
+      message.currentSubreddit,
+    ]);
+    if (currentSubreddit) params.set("currentSubreddit", currentSubreddit);
     chrome.tabs
-      .create({ url: chrome.runtime.getURL("popup/index.html?standalone=true") })
+      .create({
+        url: `${chrome.runtime.getURL("popup/index.html")}?${params.toString()}`,
+      })
       .then(
         () => sendResponse({ success: true }),
         (error) => sendResponse({ success: false, error: error.message }),
