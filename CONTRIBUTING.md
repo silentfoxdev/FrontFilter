@@ -1,41 +1,44 @@
 # Contributing to FrontFilter
 
-Thank you for helping improve FrontFilter.
+Thanks for helping improve FrontFilter.
 
-## Before making a change
+## Report a bug or propose a change
 
-- Search the [issue tracker](https://github.com/SilentFoxDev/FrontFilter/issues) for an
-  existing report or proposal.
-- Open an issue before starting a large behavioral or architectural change.
-- Use English for code, comments, commit messages, documentation, and UI text.
-- Never commit credentials, personal data, browser profiles, exported settings,
-  or generated release archives.
+Search the [issue tracker](https://github.com/SilentFoxDev/FrontFilter/issues)
+before opening a new issue. For bugs, include:
 
-## Development workflow
+- FrontFilter and browser versions;
+- the Reddit layout and relevant settings;
+- steps to reproduce, expected behavior, and actual behavior.
 
-FrontFilter has no runtime or npm package dependencies. Node.js 20 or newer and
-Python 3 are required for the default workflow.
+Open an issue before starting a large feature or architectural change. Remove
+usernames, cookies, tokens, browsing details, and private filter lists from all
+reports and attachments.
+
+## Make a change
+
+Use Node.js 20 or newer and Python 3. The project has no npm dependencies, so a
+checkout is ready to test without `npm install`.
 
 ```bash
 npm test
 npm run check
 npm run build
+git diff --check
 ```
 
-The browser integration tests require Selenium and local Firefox or Chrome
-binaries. See the browser-test instructions in [README.md](README.md).
+Keep each change focused, preserve existing settings and browser compatibility,
+and add regression coverage for changed behavior. Use English for source code,
+UI text, documentation, and commit messages. Do not commit generated archives,
+browser profiles, exported settings, credentials, or personal data.
 
-Keep changes focused and add regression coverage for behavior changes. Before
-opening a pull request, verify that:
+Optional browser tests require Selenium and local browser binaries. See the
+[development section](README.md#development) for commands.
 
-- unit tests and source validation pass;
-- both release archives build successfully;
-- `git diff --check` reports no whitespace errors;
-- affected behavior has been checked in Firefox and Chrome when practical;
+## Pull request checklist
 
-## Reporting bugs
-
-Include the FrontFilter version, browser and version, Reddit layout, relevant
-settings, expected result, and actual result. Remove usernames, subreddit lists,
-cookies, tokens, and other private information before attaching screenshots or
-configuration files.
+- Explain the problem and the chosen solution.
+- Link related issues and call out user-visible changes.
+- Confirm that the commands above pass.
+- Test affected behavior in Firefox and Chrome when practical.
+- Update user documentation when behavior or permissions change.

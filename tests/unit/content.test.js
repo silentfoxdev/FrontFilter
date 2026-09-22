@@ -68,9 +68,14 @@ async function loadContent({ querySelectorAll = () => [], settings, startUrl }) 
   });
 
   // This harness isolates legacy filtering. The limiter has its own DOM tests.
-  vm.runInContext('var FrontFilterFeedStub = { update() {} };', context);
+  vm.runInContext(`
+    var FrontFilterFeedStub = {
+      updateCount: 0,
+      update() { this.updateCount += 1; },
+    };
+  `, context);
 
-  for (const file of ["shared/core.js", "content/main.js"]) {
+  for (const file of ["shared/core.js", "content/post-elements.js", "content/main.js"]) {
     const source = readFileSync(join(__dirname, "..", "..", "src", file), "utf8");
     vm.runInContext(source, context, { filename: file });
     if (file === "shared/core.js") {
@@ -81,6 +86,7 @@ async function loadContent({ querySelectorAll = () => [], settings, startUrl }) 
 
   return {
     checkCurrentPage: context.checkCurrentPage,
+    getFeedLimiterUpdateCount: () => context.FrontFilterFeedStub.updateCount,
     processFilteredContent: context.processFilteredContent,
     location,
     redirects,
@@ -198,6 +204,22 @@ test("ignores legacy translation settings on load, storage changes and SPA navig
   content.storageListeners[0]({ disableAutoTranslation: { newValue: false } }, "local");
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(content.redirects, []);
+});
+
+test("updates the feed limiter once when an SPA navigation changes the URL", async () => {
+  const content = await loadContent({
+    settings: { limitInfiniteScroll: true },
+    startUrl: "https://www.reddit.com/r/firefox/",
+  });
+  const initialUpdateCount = content.getFeedLimiterUpdateCount();
+
+  content.location.href = "https://www.reddit.com/r/javascript/";
+  content.location.pathname = "/r/javascript/";
+  await content.checkCurrentPage();
+  assert.equal(content.getFeedLimiterUpdateCount(), initialUpdateCount + 1);
+
+  await content.checkCurrentPage();
+  assert.equal(content.getFeedLimiterUpdateCount(), initialUpdateCount + 1);
 });
 
 test("blocking rules apply to translated pages", async () => {
@@ -414,17 +436,25 @@ test("hides links to blocked main pages from the top left-navigation section", a
   assert.match(style.textContent, /a\[href="\/explore" i\]/);
 });
 
-test("hides every global feed-sort link when the homepage is blocked", async () => {
+test("hides global feed-sort links and the navbar logo when the homepage is blocked", async () => {
   const content = await loadContent({
     settings: { blockHomepage: true },
     startUrl: "https://www.reddit.com/r/firefox/",
   });
-  const styleText = content.injectedStyles[0].textContent;
+  const style = content.injectedStyles[0];
 
   for (const sort of ["best", "hot", "new", "top", "rising", "controversial"]) {
-    assert.ok(styleText.includes(`a[href="/${sort}" i]`), sort);
-    assert.ok(styleText.includes(`a[href^="/${sort}?" i]`), sort);
+    assert.ok(style.textContent.includes(`a[href="/${sort}" i]`), sort);
+    assert.ok(style.textContent.includes(`a[href^="/${sort}?" i]`), sort);
   }
+  assert.match(style.textContent, /#shreddit-header #reddit-logo/);
+  assert.match(style.textContent, /a:has\(#reddit-logo\)/);
+
+  content.storageListeners[0]({
+    blockHomepage: { oldValue: true, newValue: false },
+  }, "local");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.doesNotMatch(style.textContent, /#reddit-logo/);
 });
 
 test("updates blocked main-page links inside the top navigation shadow root", async () => {

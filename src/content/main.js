@@ -60,26 +60,6 @@ const POST_FALLBACK_SELECTORS = [
 const POST_ROOT_SELECTOR = POST_ROOT_SELECTORS.join(", ");
 const POST_SELECTOR = [...POST_ROOT_SELECTORS, ...POST_FALLBACK_SELECTORS].join(", ");
 const POST_PERMALINK_SELECTOR = 'a[href*="/comments/"]';
-const POST_TITLE_SELECTOR = [
-  '[slot="title"]',
-  '[data-testid="post-title"]',
-  '[data-testid="post-title-text"]',
-  '[data-adclicklocation="title"]',
-  'a[id^="post-title"]',
-  "a.title",
-  'h1[id^="post-title"]',
-  "h2",
-  "h3",
-].join(", ");
-const POST_BODY_SELECTOR = [
-  '[slot="text-body"]',
-  '[data-post-click-location="text-body"]',
-  '[data-testid="post-content"]',
-  '[data-testid="post-body"]',
-  '[data-click-id="text"]',
-  "shreddit-post-text-body",
-  ".usertext-body .md",
-].join(", ");
 const COMMENT_LAYOUT_SELECTOR = [
   "shreddit-comment",
   "shreddit-comment-tree",
@@ -179,6 +159,12 @@ const NAVBAR_SECTION_SELECTORS = Object.freeze({
     '[data-part]:not([data-part="chat"]):not([data-part="inbox"]):not([data-part="menu"]):not([data-part="search"]):not([data-part="profile"]):not([data-part="logo"]):not(:has(#reddit-logo)):not(:has(#navbar-menu-button)):not(:has(reddit-search-large)):not(:has(reddit-search-small)):not(:has(#expand-user-drawer-button))',
   ]),
 });
+const NAVBAR_LOGO_SELECTOR = scopeNavbarSelectors([
+  "#reddit-logo",
+  "a:has(#reddit-logo)",
+  '[data-part="logo"]',
+  'a:has([data-part="logo"])',
+]);
 const LEFT_SIDEBAR_SELECTOR = [
   "#left-sidebar-container",
   "#left-sidebar",
@@ -189,7 +175,7 @@ const MAIN_PAGE_LINK_SELECTORS = Object.freeze({
     'a[href^="/?" i]',
     'a[href="https://www.reddit.com/" i]',
     'a[href^="https://www.reddit.com/?" i]',
-    ...["best", "hot", "new", "top", "rising", "controversial"].flatMap((sort) => [
+    ...FrontFilter.LISTING_SORTS.flatMap((sort) => [
       `a[href="/${sort}" i]`,
       `a[href^="/${sort}/" i]`,
       `a[href^="/${sort}?" i]`,
@@ -223,6 +209,7 @@ const MAIN_PAGE_LINK_SELECTORS = Object.freeze({
     'a[href^="https://www.reddit.com/news?" i]',
   ],
 });
+const MAIN_PAGE_SETTING_KEYS = Object.freeze(Object.keys(MAIN_PAGE_LINK_SELECTORS));
 // These structural identifiers are stable across Reddit locales. Include the
 // async placeholders so a hidden section cannot flash while it is loading.
 const LEFT_SIDEBAR_SECTION_SELECTORS = Object.freeze({
@@ -310,8 +297,10 @@ async function checkCurrentPage({ force = false } = {}) {
   await loadConfig();
 
   const currentUrl = window.location.href;
-  if (!force && currentUrl === lastCheckedUrl) return;
+  const urlChanged = currentUrl !== lastCheckedUrl;
+  if (!force && !urlChanged) return;
   lastCheckedUrl = currentUrl;
+  if (urlChanged) feedLimiter.update();
   const path = window.location.pathname;
   const route = FrontFilter.getBlockedRoute(path, config);
   if (route) {
@@ -381,7 +370,7 @@ function getPostTitle(postElement) {
     if (title) return title;
   }
 
-  for (const titleElement of postElement.querySelectorAll(POST_TITLE_SELECTOR)) {
+  for (const titleElement of postElement.querySelectorAll(FrontFilter.POST_SELECTORS.title)) {
     const nestedPost = titleElement.closest?.(POST_ROOT_SELECTOR);
     if (nestedPost && nestedPost !== postElement) continue;
 
@@ -399,7 +388,7 @@ function getPostBodyTexts(postElement) {
     if (text) texts.add(text);
   }
 
-  for (const bodyElement of postElement.querySelectorAll(POST_BODY_SELECTOR)) {
+  for (const bodyElement of postElement.querySelectorAll(FrontFilter.POST_SELECTORS.body)) {
     if (bodyElement.closest?.(COMMENT_LAYOUT_SELECTOR)) continue;
     const nestedPost = bodyElement.closest?.(POST_ROOT_SELECTOR);
     if (nestedPost && nestedPost !== postElement) continue;
@@ -507,7 +496,7 @@ function needsDynamicContentProcessing() {
     || filterIndex.blockedFrontSubreddits.length > 0
     || config.hideComments
     || config.disableAutoplay
-    || Object.keys(MAIN_PAGE_LINK_SELECTORS).some((setting) => config[setting]);
+    || MAIN_PAGE_SETTING_KEYS.some((setting) => config[setting]);
 }
 
 function configureContentObserver() {
@@ -558,6 +547,9 @@ function ensureHiddenStyle() {
     .filter(([setting]) => config[setting])
     .map(([, selector]) => `\n${selector} { display: none !important; }`)
     .join("");
+  const navbarLogoRule = config.blockHomepage
+    ? `\n${NAVBAR_LOGO_SELECTOR} { display: none !important; }`
+    : "";
   const mainPageLinkRule = createMainPageLinkRule(
     "#left-sidebar left-nav-top-section",
   );
@@ -565,7 +557,7 @@ function ensureHiddenStyle() {
     ? `\n${commentSelector} { display: none !important; }`
     : "") + (config.hideNavbar
     ? `\n${NAVBAR_SELECTOR} { display: none !important; }\n${NAVBAR_LAYOUT_STYLE}`
-    : "") + navbarSectionRules + (config.hideLeftSidebar
+    : "") + navbarSectionRules + navbarLogoRule + (config.hideLeftSidebar
     ? `\n${LEFT_SIDEBAR_SELECTOR} { display: none !important; }`
     : "") + leftSidebarSectionRules + mainPageLinkRule + (config.hideRelatedPosts
     ? `\n${RIGHT_SIDEBAR_SELECTOR} { display: none !important; }`
@@ -628,8 +620,7 @@ function processFilteredContent() {
   if (config.disableAutoplay || videoAutoplayDisabled) {
     syncVideoAutoplay();
   }
-  const shouldHideMainPageLinks = Object.keys(MAIN_PAGE_LINK_SELECTORS)
-    .some((setting) => config[setting]);
+  const shouldHideMainPageLinks = MAIN_PAGE_SETTING_KEYS.some((setting) => config[setting]);
   if (shouldHideMainPageLinks || mainPageLinksHidden) {
     syncShadowMainPageLinks();
   }
@@ -642,60 +633,59 @@ function processFilteredContent() {
 }
 
 function syncShadowMainPageLinks() {
-  const styleText = createMainPageLinkRule();
-  document.querySelectorAll("left-nav-top-section").forEach((section) => {
-    const shadowRoot = section.shadowRoot;
+  syncShadowRootStyles(
+    "left-nav-top-section",
+    MAIN_PAGE_LINK_STYLE_ID,
+    createMainPageLinkRule(),
+  );
+}
+
+function syncShadowRootStyles(hostSelector, styleId, styleText) {
+  document.querySelectorAll(hostSelector).forEach((host) => {
+    const shadowRoot = host.shadowRoot;
     if (!shadowRoot) return;
 
-    let style = shadowRoot.querySelector(`#${MAIN_PAGE_LINK_STYLE_ID}`);
+    let style = shadowRoot.querySelector(`#${styleId}`);
     if (!style && styleText) {
       style = document.createElement("style");
-      style.id = MAIN_PAGE_LINK_STYLE_ID;
+      style.id = styleId;
       shadowRoot.appendChild(style);
     }
     if (style) style.textContent = styleText;
   });
 }
 
-function setupMainPageLinkMonitor() {
-  const definition = globalThis.customElements?.whenDefined?.("left-nav-top-section");
+function monitorCustomElement(elementName, shouldSync, sync) {
+  const definition = globalThis.customElements?.whenDefined?.(elementName);
   if (!definition) return;
 
   void definition.then(() => {
     requestAnimationFrame(() => {
-      if (mainPageLinksHidden) syncShadowMainPageLinks();
+      if (shouldSync()) sync();
     });
   });
+}
+
+function setupMainPageLinkMonitor() {
+  monitorCustomElement(
+    "left-nav-top-section",
+    () => mainPageLinksHidden,
+    syncShadowMainPageLinks,
+  );
 }
 
 function syncShadowCommentActions() {
   // The modern feed action row lives inside each shreddit-post shadow root,
   // beyond the reach of the document-level stylesheet.
-  document.querySelectorAll("shreddit-post").forEach((post) => {
-    const shadowRoot = post.shadowRoot;
-    if (!shadowRoot) return;
-
-    let style = shadowRoot.querySelector(`#${COMMENT_ACTION_STYLE_ID}`);
-    if (!style && config.hideComments) {
-      style = document.createElement("style");
-      style.id = COMMENT_ACTION_STYLE_ID;
-      shadowRoot.appendChild(style);
-    }
-    if (style) {
-      style.textContent = config.hideComments ? COMMENT_ACTION_STYLE_TEXT : "";
-    }
-  });
+  syncShadowRootStyles(
+    "shreddit-post",
+    COMMENT_ACTION_STYLE_ID,
+    config.hideComments ? COMMENT_ACTION_STYLE_TEXT : "",
+  );
 }
 
 function setupCommentActionMonitor() {
-  const definition = globalThis.customElements?.whenDefined?.("shreddit-post");
-  if (!definition) return;
-
-  void definition.then(() => {
-    requestAnimationFrame(() => {
-      if (config.hideComments) syncShadowCommentActions();
-    });
-  });
+  monitorCustomElement("shreddit-post", () => config.hideComments, syncShadowCommentActions);
 }
 
 function getSavedAutoplayAttributes(element) {
@@ -774,14 +764,7 @@ function syncVideoAutoplay() {
 }
 
 function setupVideoAutoplayMonitor() {
-  const definition = globalThis.customElements?.whenDefined?.("shreddit-player");
-  if (!definition) return;
-
-  void definition.then(() => {
-    requestAnimationFrame(() => {
-      if (config.disableAutoplay) syncVideoAutoplay();
-    });
-  });
+  monitorCustomElement("shreddit-player", () => config.disableAutoplay, syncVideoAutoplay);
 }
 
 function processPostElements() {

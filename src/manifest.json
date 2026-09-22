@@ -44,6 +44,7 @@
       ],
       "js": [
         "shared/core.js",
+        "content/post-elements.js",
         "content/feed-window.js",
         "content/feed-limit.js",
         "content/main.js"

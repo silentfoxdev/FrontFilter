@@ -220,6 +220,7 @@ def main():
                     "homepage": False, "popular": False,
                     "explore": False, "news": True,
                 })
+                wait.until(lambda _: not driver.execute_script("return navbarVisibility().logo"))
                 configure({
                     "blockHomepage": False,
                     "blockPopular": False,
@@ -227,7 +228,8 @@ def main():
                     "blockNews": False,
                 })
                 wait.until(lambda _: driver.execute_script("return mainPageLinkVisibility()") == visible_main_page_links)
-                print("PASS Chrome blocked main-page links hidden from left navigation", flush=True)
+                wait.until(lambda _: driver.execute_script("return navbarVisibility().logo"))
+                print("PASS Chrome blocked main-page links hidden from navigation", flush=True)
 
                 configure({
                     "limitInfiniteScroll": True,

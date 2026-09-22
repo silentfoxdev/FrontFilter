@@ -29,6 +29,14 @@ function deferred() {
 
 const FrontFilter = loadShared();
 
+test("exposes the immutable Reddit listing-sort vocabulary", () => {
+  assert.deepEqual(
+    Array.from(FrontFilter.LISTING_SORTS),
+    ["best", "hot", "new", "top", "rising", "controversial"],
+  );
+  assert.equal(Object.isFrozen(FrontFilter.LISTING_SORTS), true);
+});
+
 test("normalizes subreddit names and Reddit URLs", () => {
   assert.equal(FrontFilter.normalizeSubredditName(" r/JavaScript/ "), "javascript");
   assert.equal(

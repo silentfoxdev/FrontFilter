@@ -59,9 +59,9 @@ FrontFilter.createNavigationRules = function (settings, blockPageUrl) {
     }, priority);
   }
 
-  const frontSorts = "(best|hot|new|top|rising|controversial)";
+  const listingSorts = `(${FrontFilter.LISTING_SORTS.join("|")})`;
   const pageRules = [
-    ["blockHomepage", "homepage", "Homepage", `${reddit}(/${frontSorts})?/?${query}`],
+    ["blockHomepage", "homepage", "Homepage", `${reddit}(/${listingSorts})?/?${query}`],
     ["blockPopular", "popular", "r/popular", `${reddit}/r/popular(/.*)?${query}`],
     ["blockExplore", "explore", "Explore", `${reddit}/explore(/.*)?${query}`],
     ["blockNews", "news", "News", `${reddit}/news(/.*)?${query}`],
@@ -85,8 +85,7 @@ FrontFilter.createNavigationRules = function (settings, blockPageUrl) {
     );
   }
 
-  const sorts = "(top|hot|new|rising|best|controversial)";
-  const frontSuffix = `(/${sorts}(/.*)?)?/*${query}`;
+  const frontSuffix = `(/${listingSorts}(/.*)?)?/*${query}`;
   if (config.blockSubHome) {
     addRedirect(
       `${reddit}/r/[a-z0-9_]+${frontSuffix}`,

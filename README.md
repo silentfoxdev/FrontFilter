@@ -1,125 +1,85 @@
 # FrontFilter
 
-FrontFilter is a Manifest V3 browser extension for Firefox and Google Chrome. It
-helps you make Reddit intentional again by blocking selected destinations,
-filtering communities from feeds, simplifying the interface, and putting a
-finite window in front of infinite scrolling.
+FrontFilter is a browser extension for making Reddit less distracting. It
+blocks unwanted destinations and communities, removes selected interface
+elements, filters posts, and replaces endless scrolling with a finite feed.
 
 ## Features
 
-- Block the Reddit homepage, Popular, Explore, and News pages.
-- Block every subreddit front page.
-- Add exact or wildcard subreddit rules such as `news`, `news*`, `*news`, or
-  `*news*`. Use `HOME` mode to block only a subreddit's front and sorting pages. Use `ALL` mode to block every page in a subreddit and hide its posts in
-  other feeds.
-- Add exact subreddit exceptions that take precedence over the global
-  subreddit-front-page block and over exact or wildcard subreddit rules.
-- Hide posts whose titles or text previews contain a configured keyword or
-  phrase, using case-insensitive matching.
-- Disable video autoplay; hide every comment or only replies to comments; and
-  hide the top navigation bar or either sidebar independently. Individual left
-  sidebar sections—Games, Custom feeds, Recent, Communities, and Resources—can
-  also be hidden separately. The navbar menu, search, chat, notifications,
-  profile menu, and remaining actions can likewise be hidden independently.
-- Hide blocked communities from popular-community panels.
-- Limit modern Reddit feeds to a fixed number of posts or reveal one finite
-  group at a time with a **Show next** button.
-- Follow the system color scheme or choose a persistent light or dark theme for
-  the extension interface.
-- Import and export settings as JSON.
+- Block Home, Popular, Explore, News, or every subreddit front page.
+- Block exact or wildcard subreddit names. `HOME` rules cover front and sort
+  pages; `ALL` rules also cover posts and other pages in that subreddit.
+- Allow exact subreddit exceptions to override subreddit rules.
+- Filter post titles and text previews by keyword or phrase.
+- Hide comments, navigation controls, sidebar sections, and related posts, or
+  disable video autoplay.
+- Show a fixed number of feed posts or reveal them in finite groups.
+- Import and export settings as JSON, with system, light, and dark themes.
+
+All filtering and settings stay in the browser. FrontFilter has no analytics,
+accounts, ads, or remote services. See [PRIVACY.md](PRIVACY.md) for details.
 
 ## Browser support
 
-- Firefox 140 or newer
-- Firefox for Android 142 or newer
-- Google Chrome 121 or newer
+| Browser | Minimum version |
+| --- | ---: |
+| Chrome | 121 |
+| Firefox | 140 |
+| Firefox for Android | 142 |
 
-The extension has one shared codebase. Firefox runs a non-persistent background
-script, while Chrome runs the equivalent extension service worker.
+## Install from source
 
-## Install for development
-
-### Firefox
-
-1. Run `npm run build` to generate the Firefox-specific manifest and archive.
-2. Open `about:debugging#/runtime/this-firefox`.
-3. Select **Load Temporary Add-on**.
-4. Choose `dist/frontfilter-firefox-2.1.0.xpi`.
-
-### Chrome
-
-1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Select **Load unpacked**.
-4. Choose the `src/` directory.
-
-`src/manifest.json` is directly loadable by Chrome. The build overlays
-`manifests/firefox.json` for Firefox, which uses background scripts instead of a
-service worker and includes the required Gecko metadata.
-
-## Permissions
-
-| Permission | Purpose |
-| --- | --- |
-| `storage` | Persist settings locally in the browser profile. |
-| `declarativeNetRequest` | Redirect blocked top-level Reddit navigations to the bundled block page. |
-| Reddit host access | Run the content script, read the current Reddit tab, and apply navigation rules. |
-
-FrontFilter does not collect or transmit user data. Version 2.1.0 makes no API
-requests to Reddit or to third-party services. All code and assets are bundled
-with the extension.
-
-## Development
-
-The default checks require only Node.js and Python 3; the extension itself has
-no npm runtime dependencies.
+Node.js 20 or newer and Python 3 are required to build release archives.
 
 ```bash
-npm test
-npm run check
 npm run build
 ```
 
-`npm test` runs unit and DOM-harness regression tests for shared rules,
-declarative redirects, the background lifecycle, content filtering, the popup,
-the block page, and the feed window.
+For Chrome, open `chrome://extensions`, enable **Developer mode**, choose
+**Load unpacked**, and select `src/`. For Firefox, open
+`about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and
+select the generated `dist/frontfilter-firefox-<version>.xpi` file.
 
-`npm run build` validates the source and creates deterministic archives in
-`dist/`:
+The source manifest is directly loadable by Chrome. The build applies
+`manifests/firefox.json` to create the Firefox package and writes both archives
+to `dist/`.
 
-```text
-dist/frontfilter-firefox-2.1.0.xpi
-dist/frontfilter-chrome-2.1.0.zip
-```
+## Development
 
-Set `SOURCE_DATE_EPOCH` to choose the timestamp embedded in release archives.
-
-### Browser integration tests
-
-The optional Selenium tests use a temporary extension and a local fixture. They
-do not visit Reddit.
+FrontFilter has no runtime or npm package dependencies.
 
 ```bash
-python3 -m venv /tmp/frontfilter-browser-tests
-/tmp/frontfilter-browser-tests/bin/pip install selenium
-
-/tmp/frontfilter-browser-tests/bin/python tests/browser/firefox.py \
-  --firefox /path/to/firefox
-
-/tmp/frontfilter-browser-tests/bin/python tests/browser/chrome.py \
-  --chrome /path/to/chrome
+npm test       # unit and DOM-harness regression tests
+npm run check  # source and manifest validation
+npm run build  # deterministic Firefox and Chrome archives
 ```
 
-Both suites verify a real declarative main-frame redirect on a local host. The
-Firefox suite also covers the native popup UI and detailed feed behavior. The
-Chrome smoke suite verifies MV3 service-worker startup, content filtering,
-finite-feed behavior, popup persistence, and removal of the obsolete control.
+Set `SOURCE_DATE_EPOCH` to control archive timestamps.
 
+Optional Selenium suites exercise packaged extensions against local fixtures;
+they do not visit Reddit:
 
-## AI-assisted development
+```bash
+python3 tests/browser/firefox.py --firefox /path/to/firefox
+python3 tests/browser/chrome.py --chrome /path/to/chrome
+```
 
-The code in this project has been developed using AI coding tools.
+Install Selenium in a temporary virtual environment before running those
+commands. Chrome requires `--chrome`; Firefox uses the system browser when
+`--firefox` is omitted.
 
-The project is human-directed: feature selection, requirements, technical decisions, testing, validation, and overall review are performed by the maintainer, while the implementation itself is produced with the assistance of AI.
+## Permissions
 
-This note is included for transparency about the development process.
+| Permission | Why it is needed |
+| --- | --- |
+| `storage` | Save settings in the local browser profile. |
+| `declarativeNetRequest` | Redirect blocked Reddit navigations to the bundled block page. |
+| Access to `reddit.com` | Apply filters and identify the current subreddit for **Add Current**. |
+
+## Contributing
+
+Bug reports and focused pull requests are welcome. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) before making a change.
+
+Development is human-directed and uses AI coding tools. This note is included
+for transparency.

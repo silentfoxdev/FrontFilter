@@ -6,26 +6,6 @@ FrontFilter.createFeedLimiter = function ({ getSettings, isBlocked }) {
   const FEED = "shreddit-feed";
   const LOADER = 'faceplate-partial[slot="load-after"]';
   const CARD = 'shreddit-post, shreddit-ad-post, [data-testid="ad-container"]';
-  const TITLE = [
-    '[slot="title"]',
-    '[data-testid="post-title"]',
-    '[data-testid="post-title-text"]',
-    '[data-adclicklocation="title"]',
-    'a[id^="post-title"]',
-    "a.title",
-    'h1[id^="post-title"]',
-    "h2",
-    "h3",
-  ].join(", ");
-  const BODY = [
-    '[slot="text-body"]',
-    '[data-post-click-location="text-body"]',
-    '[data-testid="post-content"]',
-    '[data-testid="post-body"]',
-    '[data-click-id="text"]',
-    "shreddit-post-text-body",
-    ".usertext-body .md",
-  ].join(", ");
   const BRIDGE_ATTRIBUTE = "data-frontfilter-feed-bridge";
   const REQUEST_ATTRIBUTE = "data-frontfilter-load-request";
   const ERROR_ATTRIBUTE = "data-frontfilter-load-error";
@@ -88,10 +68,10 @@ FrontFilter.createFeedLimiter = function ({ getSettings, isBlocked }) {
       || post.querySelector('a[href*="/comments/"]')?.getAttribute("href");
     const url = FrontFilter.getRedditUrl(permalink, window.location.origin);
     const path = url && FrontFilter.getSubredditPath(url.pathname);
+    const permalinkId = path?.rest.match(/^comments\/([a-z0-9]+)/i)?.[1];
     const id = [post.getAttribute("id"), post.getAttribute("post-id")]
       .find((value) => /^t3_[a-z0-9]+$/i.test(value || ""))?.toLowerCase()
-      || (path?.rest.match(/^comments\/([a-z0-9]+)/i)?.[1]
-        ? `t3_${path.rest.match(/^comments\/([a-z0-9]+)/i)[1].toLowerCase()}` : "");
+      || (permalinkId ? `t3_${permalinkId.toLowerCase()}` : "");
     const subreddit = FrontFilter.normalizeSubredditName(
       post.getAttribute("subreddit-name") || post.getAttribute("subreddit-prefixed-name")
       || post.getAttribute("data-subreddit") || post.getAttribute("data-subreddit-prefixed")
@@ -102,14 +82,14 @@ FrontFilter.createFeedLimiter = function ({ getSettings, isBlocked }) {
       || !!post.querySelector('shreddit-ad-post, [data-testid="promoted-label"]');
     const title = post.getAttribute("post-title")?.trim()
       || post.getAttribute("data-title")?.trim()
-      || post.querySelector(TITLE)?.textContent?.trim()
+      || post.querySelector(FrontFilter.POST_SELECTORS.title)?.textContent?.trim()
       || "";
     const bodyTexts = new Set();
     for (const attributeName of ["post-body", "data-post-body"]) {
       const text = post.getAttribute(attributeName)?.trim();
       if (text) bodyTexts.add(text);
     }
-    for (const bodyElement of post.querySelectorAll(BODY)) {
+    for (const bodyElement of post.querySelectorAll(FrontFilter.POST_SELECTORS.body)) {
       const nestedPost = bodyElement.closest?.(CARD);
       if (nestedPost && nestedPost !== post) continue;
       const text = bodyElement.textContent?.trim();
@@ -129,7 +109,7 @@ FrontFilter.createFeedLimiter = function ({ getSettings, isBlocked }) {
     return rows;
   }
 
-  function visible(element, value) {
+  function setVisible(element, value) {
     setAttribute(element, "data-frontfilter-limit-visible", value);
     setAttribute(element, "data-frontfilter-limit-hidden", !value);
   }
@@ -147,10 +127,10 @@ FrontFilter.createFeedLimiter = function ({ getSettings, isBlocked }) {
       const show = row.ad ? index < lastVisible
         : state.allowed.has(row.id) && !seen.has(row.id);
       if (!row.ad && row.id) seen.add(row.id);
-      visible(row.post, show);
-      visible(row.element, show);
+      setVisible(row.post, show);
+      setVisible(row.element, show);
       const divider = row.element.nextElementSibling;
-      if (divider?.matches("hr")) visible(divider, show);
+      if (divider?.matches("hr")) setVisible(divider, show);
     });
     // Clearing stale markers must not reveal newly inserted, unclassified cards.
     const elements = new Set(rows.flatMap(({ element, post }) => [element, post, element.nextElementSibling]));

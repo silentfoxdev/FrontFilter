@@ -8,23 +8,22 @@
 const OBSOLETE_STORAGE_KEYS = ["blockNsfw", "blockAll", "blockNew", "blockTop"];
 let ruleSyncQueue = Promise.resolve();
 
-function replaceNavigationRules() {
-  return Promise.all([
+async function replaceNavigationRules() {
+  const [storedSettings, currentRules] = await Promise.all([
     chrome.storage.local.get(FrontFilter.NAVIGATION_STORAGE_KEYS),
     chrome.declarativeNetRequest.getDynamicRules(),
-  ]).then(([storedSettings, currentRules]) => {
-    const removeRuleIds = currentRules
-      .filter(({ id }) => FrontFilter.isNavigationRuleId(id))
-      .map(({ id }) => id);
-    const addRules = FrontFilter.createNavigationRules(
-      storedSettings,
-      chrome.runtime.getURL("blocked/index.html"),
-    );
+  ]);
+  const removeRuleIds = currentRules
+    .filter(({ id }) => FrontFilter.isNavigationRuleId(id))
+    .map(({ id }) => id);
+  const addRules = FrontFilter.createNavigationRules(
+    storedSettings,
+    chrome.runtime.getURL("blocked/index.html"),
+  );
 
-    return chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds,
-      addRules,
-    });
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds,
+    addRules,
   });
 }
 

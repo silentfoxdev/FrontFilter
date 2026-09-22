@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ]),
   );
 
-  let entries = [];
+  let blockedEntries = [];
   let allowedEntries = [];
   let keywordEntries = [];
   let toastTimer = null;
@@ -236,7 +236,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function getSettingsSnapshot() {
     return {
       ...getCheckboxSettings(),
-      blockedSubreddits: FrontFilter.normalizeBlockedSubreddits(entries),
+      blockedSubreddits: FrontFilter.normalizeBlockedSubreddits(blockedEntries),
       allowedSubreddits: FrontFilter.normalizeAllowedSubreddits(
         allowedEntries.map((entry) => entry.name),
       ),
@@ -325,57 +325,82 @@ document.addEventListener("DOMContentLoaded", () => {
     await saveQueue;
   }
 
-  function sortEntries() {
-    entries.sort((a, b) => {
-      if (!a.name && !b.name) return 0;
-      if (!a.name) return -1;
-      if (!b.name) return 1;
-      return a.name.localeCompare(b.name);
+  function sortDraftEntries(draftEntries, key, options) {
+    draftEntries.sort((a, b) => {
+      if (!a[key] && !b[key]) return 0;
+      if (!a[key]) return -1;
+      if (!b[key]) return 1;
+      return a[key].localeCompare(b[key], undefined, options);
     });
   }
 
-  function renderEmptyState() {
+  function appendEmptyState(container, message) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-
     const icon = document.createElement("span");
     icon.textContent = "-";
-
     empty.appendChild(icon);
-    empty.appendChild(document.createTextNode("No subreddits blocked yet"));
-    blockedListEl.appendChild(empty);
+    empty.appendChild(document.createTextNode(message));
+    container.appendChild(empty);
+  }
+
+  function createRemoveButton(ariaLabel) {
+    const button = document.createElement("button");
+    button.className = "remove-btn";
+    button.title = "Remove";
+    button.setAttribute("aria-label", ariaLabel);
+    button.textContent = "x";
+    button.disabled = controlsDisabled;
+    return button;
+  }
+
+  function focusListInput(container, itemSelector, normalizedValue, animate) {
+    const items = container.querySelectorAll(itemSelector);
+    const target = normalizedValue
+      ? Array.from(items).find(
+          (item) => item.querySelector("input").value === normalizedValue,
+        )
+      : items[0];
+
+    if (!target) return;
+    if (animate) target.classList.add("pop-in");
+    target.querySelector("input").focus();
+  }
+
+  function setCount(element, count, singular, plural) {
+    element.textContent = `${count} ${count === 1 ? singular : plural}`;
   }
 
   function updateBlockedCount() {
-    const count = FrontFilter.normalizeBlockedSubreddits(entries).length;
-    blockedCount.textContent = `${count} ${count === 1 ? "rule" : "rules"}`;
+    const count = FrontFilter.normalizeBlockedSubreddits(blockedEntries).length;
+    setCount(blockedCount, count, "rule", "rules");
   }
 
   function updateAllowedCount() {
     const count = FrontFilter.normalizeAllowedSubreddits(
       allowedEntries.map((entry) => entry.name),
     ).length;
-    allowedCount.textContent = `${count} ${count === 1 ? "exception" : "exceptions"}`;
+    setCount(allowedCount, count, "exception", "exceptions");
   }
 
   function updateTitleKeywordCount() {
     const count = FrontFilter.normalizeTitleKeywords(
       keywordEntries.map((entry) => entry.value),
     ).length;
-    titleKeywordCount.textContent = `${count} ${count === 1 ? "keyword" : "keywords"}`;
+    setCount(titleKeywordCount, count, "keyword", "keywords");
   }
 
   function renderList() {
     blockedListEl.innerHTML = "";
     updateBlockedCount();
 
-    if (entries.length === 0) {
-      renderEmptyState();
+    if (blockedEntries.length === 0) {
+      appendEmptyState(blockedListEl, "No subreddits blocked yet");
       return;
     }
 
-    sortEntries();
-    entries.forEach((entry) => {
+    sortDraftEntries(blockedEntries, "name");
+    blockedEntries.forEach((entry) => {
       const item = document.createElement("div");
       item.className = "blocked-item";
 
@@ -399,12 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.appendChild(option);
       }
 
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "remove-btn";
-      removeBtn.title = "Remove";
-      removeBtn.setAttribute("aria-label", "Remove subreddit rule");
-      removeBtn.textContent = "x";
-      removeBtn.disabled = controlsDisabled;
+      const removeBtn = createRemoveButton("Remove subreddit rule");
 
       input.addEventListener("input", (event) => {
         entry.name = event.target.value;
@@ -423,9 +443,9 @@ document.addEventListener("DOMContentLoaded", () => {
         scheduleAutoSave(["blockedSubreddits"], true);
       });
       removeBtn.addEventListener("click", () => {
-        const entryIndex = entries.indexOf(entry);
+        const entryIndex = blockedEntries.indexOf(entry);
         if (entryIndex < 0) return;
-        entries.splice(entryIndex, 1);
+        blockedEntries.splice(entryIndex, 1);
         renderList();
         scheduleAutoSave(["blockedSubreddits"], true);
       });
@@ -439,21 +459,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function focusEntry(name, animate) {
     const normalizedName = FrontFilter.normalizeSubredditName(name);
-    const allItems = blockedListEl.querySelectorAll(".blocked-item");
-    const target = normalizedName
-      ? Array.from(allItems).find(
-          (el) => el.querySelector("input").value === normalizedName,
-        )
-      : allItems[0];
-
-    if (!target) return;
-    if (animate) target.classList.add("pop-in");
-    target.querySelector("input").focus();
+    focusListInput(blockedListEl, ".blocked-item", normalizedName, animate);
   }
 
   function addEntry(name = "", mode = "all", animate = true) {
     const normalizedName = FrontFilter.normalizeSubredditName(name);
-    entries.unshift({
+    blockedEntries.unshift({
       name: normalizedName,
       mode: mode === "all" ? "all" : "home",
     });
@@ -467,35 +478,16 @@ document.addEventListener("DOMContentLoaded", () => {
     return FrontFilter.normalizeAllowedSubreddits([value])[0] || "";
   }
 
-  function sortAllowedEntries() {
-    allowedEntries.sort((a, b) => {
-      if (!a.name && !b.name) return 0;
-      if (!a.name) return -1;
-      if (!b.name) return 1;
-      return a.name.localeCompare(b.name);
-    });
-  }
-
-  function renderAllowedEmptyState() {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    const icon = document.createElement("span");
-    icon.textContent = "-";
-    empty.appendChild(icon);
-    empty.appendChild(document.createTextNode("No subreddit exceptions yet"));
-    allowedListEl.appendChild(empty);
-  }
-
   function renderAllowedList() {
     allowedListEl.innerHTML = "";
     updateAllowedCount();
 
     if (allowedEntries.length === 0) {
-      renderAllowedEmptyState();
+      appendEmptyState(allowedListEl, "No subreddit exceptions yet");
       return;
     }
 
-    sortAllowedEntries();
+    sortDraftEntries(allowedEntries, "name");
     allowedEntries.forEach((entry) => {
       const item = document.createElement("div");
       item.className = "allowed-item";
@@ -508,12 +500,7 @@ document.addEventListener("DOMContentLoaded", () => {
       input.spellcheck = false;
       input.disabled = controlsDisabled;
 
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "remove-btn";
-      removeBtn.title = "Remove";
-      removeBtn.setAttribute("aria-label", "Remove subreddit exception");
-      removeBtn.textContent = "x";
-      removeBtn.disabled = controlsDisabled;
+      const removeBtn = createRemoveButton("Remove subreddit exception");
 
       input.addEventListener("input", (event) => {
         entry.name = event.target.value;
@@ -544,16 +531,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function focusAllowedEntry(name, animate) {
     const normalizedName = normalizeAllowedName(name);
-    const allItems = allowedListEl.querySelectorAll(".allowed-item");
-    const target = normalizedName
-      ? Array.from(allItems).find(
-          (element) => element.querySelector("input").value === normalizedName,
-        )
-      : allItems[0];
-
-    if (!target) return;
-    if (animate) target.classList.add("pop-in");
-    target.querySelector("input").focus();
+    focusListInput(allowedListEl, ".allowed-item", normalizedName, animate);
   }
 
   function addAllowedEntry(name = "", animate = true) {
@@ -565,37 +543,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (normalizedName) scheduleAutoSave(["allowedSubreddits"], true);
   }
 
-  function sortKeywordEntries() {
-    keywordEntries.sort((a, b) => {
-      if (!a.value && !b.value) return 0;
-      if (!a.value) return -1;
-      if (!b.value) return 1;
-      return a.value.localeCompare(b.value, undefined, { sensitivity: "base" });
-    });
-  }
-
-  function renderKeywordEmptyState() {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-
-    const icon = document.createElement("span");
-    icon.textContent = "-";
-
-    empty.appendChild(icon);
-    empty.appendChild(document.createTextNode("No post keywords filtered yet"));
-    titleKeywordListEl.appendChild(empty);
-  }
-
   function renderKeywordList() {
     titleKeywordListEl.innerHTML = "";
     updateTitleKeywordCount();
 
     if (keywordEntries.length === 0) {
-      renderKeywordEmptyState();
+      appendEmptyState(titleKeywordListEl, "No post keywords filtered yet");
       return;
     }
 
-    sortKeywordEntries();
+    sortDraftEntries(keywordEntries, "value", { sensitivity: "base" });
     keywordEntries.forEach((entry) => {
       const item = document.createElement("div");
       item.className = "keyword-item";
@@ -608,12 +565,7 @@ document.addEventListener("DOMContentLoaded", () => {
       input.spellcheck = false;
       input.disabled = controlsDisabled;
 
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "remove-btn";
-      removeBtn.title = "Remove";
-      removeBtn.setAttribute("aria-label", "Remove post keyword");
-      removeBtn.textContent = "x";
-      removeBtn.disabled = controlsDisabled;
+      const removeBtn = createRemoveButton("Remove post keyword");
 
       input.addEventListener("input", (event) => {
         entry.value = event.target.value;
@@ -643,16 +595,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function focusKeyword(keyword, animate) {
     const [normalizedKeyword = ""] = FrontFilter.normalizeTitleKeywords([keyword]);
-    const allItems = titleKeywordListEl.querySelectorAll(".keyword-item");
-    const target = normalizedKeyword
-      ? Array.from(allItems).find(
-          (element) => element.querySelector("input").value === normalizedKeyword,
-        )
-      : allItems[0];
-
-    if (!target) return;
-    if (animate) target.classList.add("pop-in");
-    target.querySelector("input").focus();
+    focusListInput(titleKeywordListEl, ".keyword-item", normalizedKeyword, animate);
   }
 
   function addKeyword(keyword = "", animate = true) {
@@ -669,7 +612,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await chrome.storage.local.get(FrontFilter.STORAGE_KEYS),
     );
 
-    entries = result.blockedSubreddits;
+    blockedEntries = result.blockedSubreddits;
     allowedEntries = result.allowedSubreddits.map((name) => ({ name }));
     keywordEntries = result.blockedTitleKeywords.map((value) => ({ value }));
     scrollLimit.value = String(result.scrollLimit);

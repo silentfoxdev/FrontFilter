@@ -48,20 +48,33 @@ var FrontFilter = (() => {
     "blockSubHome",
   ]);
 
-  const FRONT_PAGE_SORT_PATTERN = "best|hot|new|top|rising|controversial";
+  const LISTING_SORTS = Object.freeze([
+    "best",
+    "hot",
+    "new",
+    "top",
+    "rising",
+    "controversial",
+  ]);
+  const LISTING_SORT_PATTERN = LISTING_SORTS.join("|");
+  const FRONT_PAGE_PATTERN = new RegExp(`^/(?:${LISTING_SORT_PATTERN})?/?$`, "i");
+  const FEED_PAGE_PATTERN = new RegExp(
+    `^/r/[^/]+(?:/(?:${LISTING_SORT_PATTERN}))?/?$`,
+    "i",
+  );
   const PAGE_RULES = [
     {
       key: "blockHomepage",
       page: "homepage",
       filter: "Homepage",
-      pattern: new RegExp(`^/(?:${FRONT_PAGE_SORT_PATTERN})?/?$`, "i"),
+      pattern: FRONT_PAGE_PATTERN,
     },
     { key: "blockPopular", page: "popular", filter: "r/popular", pattern: /^\/r\/popular(?:\/.*)?$/i },
     { key: "blockExplore", page: "explore", filter: "Explore", pattern: /^\/explore(?:\/.*)?$/i },
     { key: "blockNews", page: "news", filter: "News", pattern: /^\/news(?:\/.*)?$/i },
   ];
 
-  const SUBREDDIT_SORTS = new Set(["top", "hot", "new", "rising", "best", "controversial"]);
+  const SUBREDDIT_SORTS = new Set(LISTING_SORTS);
   const REDDIT_HOST_PATTERN = /(^|\.)reddit\.com$/i;
 
   function getRedditUrl(value, baseUrl) {
@@ -390,8 +403,7 @@ var FrontFilter = (() => {
   }
 
   function isFeedPath(pathname) {
-    return new RegExp(`^/(?:${FRONT_PAGE_SORT_PATTERN})?/?$`, "i").test(pathname)
-      || /^\/r\/[^/]+(?:\/(?:best|hot|new|top|rising|controversial))?\/?$/i.test(pathname);
+    return FRONT_PAGE_PATTERN.test(pathname) || FEED_PAGE_PATTERN.test(pathname);
   }
 
   function blockedRouteToQuery(route, returnUrl = "") {
@@ -412,6 +424,7 @@ var FrontFilter = (() => {
   return {
     STORAGE_KEYS,
     NAVIGATION_STORAGE_KEYS,
+    LISTING_SORTS,
     DEFAULT_SETTINGS,
     applyStorageChanges,
     createSettingsStore,

@@ -21,6 +21,12 @@ test("keeps the source manifest directly loadable by Chrome MV3", () => {
   const pageBridge = chromeManifest.content_scripts.find(({ world }) => world === "MAIN");
   assert.deepEqual(pageBridge.js, ["content/feed-bridge.js"]);
   assert.equal(existsSync(join(sourceRoot, pageBridge.js[0])), true);
+  const isolatedScripts = chromeManifest.content_scripts.find(({ world }) => world !== "MAIN").js;
+  assert.ok(
+    isolatedScripts.indexOf("content/post-elements.js")
+      < isolatedScripts.indexOf("content/feed-limit.js"),
+  );
+  assert.ok(isolatedScripts.every((file) => existsSync(join(sourceRoot, file))));
 });
 
 test("builds the Firefox manifest from browser-specific overrides", () => {
@@ -35,6 +41,14 @@ test("builds the Firefox manifest from browser-specific overrides", () => {
     "background/main.js",
   ]);
   assert.ok(firefoxManifest.browser_specific_settings.gecko.id);
+  assert.equal(
+    firefoxManifest.browser_specific_settings.gecko.strict_min_version,
+    "140.0",
+  );
+  assert.equal(
+    firefoxManifest.browser_specific_settings.gecko_android.strict_min_version,
+    "142.0",
+  );
   assert.equal("minimum_chrome_version" in firefoxManifest, false);
   assert.ok(firefoxManifest.background.scripts.every(
     (file) => existsSync(join(sourceRoot, file)),

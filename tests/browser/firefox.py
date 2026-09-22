@@ -415,6 +415,7 @@ window.addEventListener("frontfilter-test-sync-rules", async () => {
                 "homepage": False, "popular": False,
                 "explore": False, "news": True,
             })
+            wait.until(lambda _: not js("return navbarVisibility().logo"))
             configure(
                 blockHomepage=False,
                 blockPopular=False,
@@ -422,7 +423,8 @@ window.addEventListener("frontfilter-test-sync-rules", async () => {
                 blockNews=False,
             )
             wait.until(lambda _: js("return mainPageLinkVisibility()") == visible_main_page_links)
-            print("PASS blocked main-page links hidden from left navigation", flush=True)
+            wait.until(lambda _: js("return navbarVisibility().logo"))
+            print("PASS blocked main-page links hidden from navigation", flush=True)
 
             configure(disableAutoplay=True)
             js("addAutoplayPlayer()")
