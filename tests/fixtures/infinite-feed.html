@@ -70,7 +70,12 @@ article { padding: 10px; }
     </faceplate-expandable-section-helper>
   </nav>
 </reddit-sidebar-nav>
-<main><shreddit-feed></shreddit-feed></main>
+<main>
+  <shreddit-feed></shreddit-feed>
+  <in-feed-community-recommendations id="suggested-communities">
+    Suggested communities
+  </in-feed-community-recommendations>
+</main>
 <section id="comments"></section>
 <aside><article><shreddit-post id="t3_sidebar" subreddit-name="safe">Sidebar post</shreddit-post></article></aside>
 <script>
@@ -235,6 +240,11 @@ article { padding: 10px; }
   window.visibleComments = () => Array.from(document.querySelectorAll("#comments shreddit-comment"))
     .filter((el) => el.getClientRects().length && getComputedStyle(el).display !== "none")
     .map((el) => el.id);
+  window.suggestedCommunitiesVisible = () => {
+    const element = document.querySelector("#suggested-communities");
+    return Boolean(element?.getClientRects().length)
+      && getComputedStyle(element).display !== "none";
+  };
   window.navbarVisibility = () => {
     const visible = (element) => Boolean(element?.getClientRects().length)
       && getComputedStyle(element).display !== "none";

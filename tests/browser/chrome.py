@@ -127,6 +127,20 @@ def main():
                 ])
                 print("PASS Chrome top-level-only comment visibility", flush=True)
 
+                configure({"hideSuggestedCommunities": False})
+                wait.until(lambda _: driver.execute_script(
+                    "return suggestedCommunitiesVisible()"
+                ))
+                configure({"hideSuggestedCommunities": True})
+                wait.until(lambda _: not driver.execute_script(
+                    "return suggestedCommunitiesVisible()"
+                ))
+                configure({"hideSuggestedCommunities": False})
+                wait.until(lambda _: driver.execute_script(
+                    "return suggestedCommunitiesVisible()"
+                ))
+                print("PASS Chrome suggested communities visibility", flush=True)
+
                 all_navbar_sections = {
                     "hideNavbarMenu": True,
                     "hideNavbarSearch": True,
@@ -301,6 +315,12 @@ document.querySelector("faceplate-partial").loadContent();
                 wait.until(lambda _: comment_replies.is_selected() and comment_replies.is_enabled())
                 comment_replies.click()
                 wait.until(lambda _: not comment_replies.is_selected())
+                suggested_communities = driver.find_element(
+                    "id", "hide-suggested-communities"
+                )
+                assert not suggested_communities.is_selected()
+                suggested_communities.click()
+                wait.until(lambda _: suggested_communities.is_selected())
                 all_navbar = driver.find_element("id", "hide-navbar")
                 navbar_sections = [driver.find_element("id", element_id) for element_id in [
                     "hide-navbar-menu",
@@ -415,6 +435,9 @@ chrome.storage.local.set({
                 wait.until(lambda _: driver.find_element("id", "block-homepage").is_selected())
                 assert driver.find_element("id", "block-explore").is_selected()
                 assert driver.find_element("id", "block-news").is_selected()
+                assert driver.find_element(
+                    "id", "hide-suggested-communities"
+                ).is_selected()
                 assert driver.find_element("id", "color-theme").get_property("value") == "light"
                 assert driver.find_element("tag name", "html").get_attribute("data-theme") == "light"
                 assert driver.execute_script("return localStorage.getItem('frontfilter-theme')") == "light"

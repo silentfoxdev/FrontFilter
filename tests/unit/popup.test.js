@@ -145,6 +145,7 @@ async function loadPopup({
     "hide-comments",
     "hide-comment-replies",
     "disable-autoplay",
+    "hide-suggested-communities",
     "hide-navbar",
     "hide-navbar-menu",
     "hide-navbar-search",
@@ -574,6 +575,7 @@ test("exports the normalized stored configuration as a JSON download", async () 
       hideRelatedPosts: true,
       disableAutoTranslation: true,
       disableAutoplay: true,
+      hideSuggestedCommunities: true,
       blockedSubreddits: ["Firefox"],
       allowedSubreddits: ["ItalyPersonalFinance", "ITALYPERSONALFINANCE"],
       blockedTitleKeywords: [" Trump ", "TRUMP"],
@@ -590,6 +592,7 @@ test("exports the normalized stored configuration as a JSON download", async () 
   const exported = await fetch(link.href).then((response) => response.json());
   assert.equal(exported.hideRelatedPosts, true);
   assert.equal(exported.disableAutoplay, true);
+  assert.equal(exported.hideSuggestedCommunities, true);
   assert.deepEqual(exported.allowedSubreddits, ["italypersonalfinance"]);
   assert.deepEqual(exported.blockedTitleKeywords, ["Trump"]);
   assert.equal(exported.theme, "system");
@@ -738,6 +741,7 @@ test("maps every checkbox to the matching storage setting", async () => {
     "hide-comments": "hideComments",
     "hide-comment-replies": "hideCommentReplies",
     "disable-autoplay": "disableAutoplay",
+    "hide-suggested-communities": "hideSuggestedCommunities",
     "hide-navbar": "hideNavbar",
     "hide-navbar-menu": "hideNavbarMenu",
     "hide-navbar-search": "hideNavbarSearch",
@@ -826,6 +830,7 @@ test("preserves current settings during a partial import", async () => {
       blockNsfw: true,
       disableAutoTranslation: true,
       disableAutoplay: true,
+      hideSuggestedCommunities: true,
       allowedSubreddits: [" ItalyPersonalFinance "],
       blockedTitleKeywords: ["  Trump  "],
       theme: "light",
@@ -846,6 +851,8 @@ test("preserves current settings during a partial import", async () => {
   assert.equal(elements["hide-comment-replies"].disabled, true);
   assert.equal(writes[0].settings.disableAutoplay, true);
   assert.equal(elements["disable-autoplay"].checked, true);
+  assert.equal(writes[0].settings.hideSuggestedCommunities, true);
+  assert.equal(elements["hide-suggested-communities"].checked, true);
   assert.deepEqual(
     JSON.parse(JSON.stringify(writes[0].settings.blockedTitleKeywords)),
     ["Trump"],

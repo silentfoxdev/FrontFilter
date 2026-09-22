@@ -84,6 +84,10 @@ def verify_settings_tabs(driver, wait, screenshot):
     wait.until(lambda _: comment_replies.is_selected() and comment_replies.is_enabled())
     comment_replies.click()
     wait.until(lambda _: not comment_replies.is_selected())
+    suggested_communities = driver.find_element("id", "hide-suggested-communities")
+    assert not suggested_communities.is_selected()
+    suggested_communities.click()
+    wait.until(lambda _: suggested_communities.is_selected())
     all_navbar = driver.find_element("id", "hide-navbar")
     navbar_sections = [driver.find_element("id", element_id) for element_id in [
         "hide-navbar-menu",
@@ -166,6 +170,7 @@ def verify_settings_tabs(driver, wait, screenshot):
     wait.until(lambda _: driver.find_element("id", "save-indicator").get_property("textContent") == "Saved")
     driver.refresh()
     wait.until(lambda _: driver.find_element("id", "add-subreddit").is_enabled())
+    assert driver.find_element("id", "hide-suggested-communities").is_selected()
     assert driver.find_element("tag name", "html").get_attribute("data-theme") == "light"
     assert driver.execute_script("return localStorage.getItem('frontfilter-theme')") == "light"
     assert driver.find_element("id", "color-theme").get_property("value") == "light"
@@ -323,6 +328,14 @@ window.addEventListener("frontfilter-test-sync-rules", async () => {
                 "comment-top-a", "comment-reply", "comment-deep-reply", "comment-top-b",
             ])
             print("PASS top-level-only comment visibility and parent-toggle implication", flush=True)
+
+            configure(hideSuggestedCommunities=False)
+            wait.until(lambda _: js("return suggestedCommunitiesVisible()"))
+            configure(hideSuggestedCommunities=True)
+            wait.until(lambda _: not js("return suggestedCommunitiesVisible()"))
+            configure(hideSuggestedCommunities=False)
+            wait.until(lambda _: js("return suggestedCommunitiesVisible()"))
+            print("PASS suggested communities visibility", flush=True)
 
             all_navbar_sections = {
                 "hideNavbarMenu": True,

@@ -611,6 +611,38 @@ test("switches live between all comments, top-level comments and every comment",
   assert.equal(style.textContent, baseRules);
 });
 
+test("toggles suggested communities with persistent CSS and no DOM scans", async () => {
+  const content = await loadContent({
+    settings: { hideSuggestedCommunities: true },
+    startUrl: "https://www.reddit.com/",
+  });
+  const style = content.injectedStyles[0];
+
+  assert.match(
+    style.textContent,
+    /in-feed-community-recommendations \{ display: none !important; \}/,
+  );
+  assert.deepEqual(content.queriedSelectors, []);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(content.observerOptions.at(-1))),
+    { childList: true, subtree: true },
+  );
+
+  content.storageListeners[0]({
+    hideSuggestedCommunities: { oldValue: true, newValue: false },
+  }, "local");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.doesNotMatch(style.textContent, /in-feed-community-recommendations/);
+  assert.deepEqual(content.queriedSelectors, []);
+
+  content.storageListeners[0]({
+    hideSuggestedCommunities: { oldValue: false, newValue: true },
+  }, "local");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(style.textContent, /in-feed-community-recommendations/);
+  assert.equal(content.injectedStyles.length, 1);
+});
+
 test("hides modern feed comment actions inside shreddit-post shadow roots", async () => {
   const styles = [];
   const shadowRoot = {

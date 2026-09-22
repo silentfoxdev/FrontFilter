@@ -97,6 +97,7 @@ const COMMENT_REPLY_SELECTOR = [
 ].join(", ");
 const COMMENT_ACTION_STYLE_ID = "frontfilter-comment-actions-style";
 const COMMENT_ACTION_STYLE_TEXT = `${COMMENT_ACTION_SELECTOR} { display: none !important; }`;
+const SUGGESTED_COMMUNITIES_SELECTOR = "in-feed-community-recommendations";
 const MAIN_PAGE_LINK_STYLE_ID = "frontfilter-main-page-links-style";
 const AUTOPLAY_ATTRIBUTE_NAMES = [
   "autoplay",
@@ -555,6 +556,8 @@ function ensureHiddenStyle() {
   );
   const styleText = HIDDEN_STYLE_TEXT + (commentSelector
     ? `\n${commentSelector} { display: none !important; }`
+    : "") + (config.hideSuggestedCommunities
+    ? `\n${SUGGESTED_COMMUNITIES_SELECTOR} { display: none !important; }`
     : "") + (config.hideNavbar
     ? `\n${NAVBAR_SELECTOR} { display: none !important; }\n${NAVBAR_LAYOUT_STYLE}`
     : "") + navbarSectionRules + navbarLogoRule + (config.hideLeftSidebar
